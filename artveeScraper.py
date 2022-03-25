@@ -1,4 +1,3 @@
-import boto3
 from botocore.exceptions import ClientError
 from bs4 import BeautifulSoup
 import csv
@@ -78,19 +77,21 @@ def scrape_images(img_source, img_index, title, data_path):
 
     img_dl_page = requests.get(img_source[img_index].get("href"))
     img_soup = BeautifulSoup(img_dl_page.content, "html.parser")
-    # img_link = img_soup.find("a", {"class": "prem-link gr btn btn-secondary dis snax-action snax-action-add-to-collection snax-action-add-to-collection-downloads"}).get("href")
-    # img_link = img_soup.find("a", {"class": "wp-post-image wp-post-image"}).get("href")
+    # img_link = img_soup.find("a", {"class": "prem-link gr btn btn-secondary dis snax-action
+    # snax-action-add-to-collection snax-action-add-to-collection-downloads"}).get("href") img_link = img_soup.find(
+    # "a", {"class": "wp-post-image wp-post-image"}).get("href")
+    img_link = img_soup.find("a",{"prem-link gr btn dis snax-action snax-action-add-to-collection snax-action-add-to-collection-downloads"}).get('href')
     img_name = title + ".jpg"
     img_path = os.path.join(data_path, img_name)
 
-    # with open(img_path, "wb") as img_file:
-    #     img_file.write(requests.get(img_link).content)
+    with open(img_path, "wb") as img_file:
+        img_file.write(requests.get(img_link).content)
 
         # with open(img_path, "rb") as s3_img:
         #     s3.upload_fileobj(s3_img, "artvee", title + ".jpg")
         # s3_img.close()
 
-        # img_file.close()
+        img_file.close()
 
     # os.remove(img_path)
 
