@@ -9,6 +9,7 @@ import os
 import re
 import requests
 
+
 def create_bucket(bucket_name, s3, region=None):
     try:
         if region is None:
@@ -16,11 +17,12 @@ def create_bucket(bucket_name, s3, region=None):
         else:
             location = {'LocationConstraint': region}
             s3.create_bucket(Bucket=bucket_name,
-                                    CreateBucketConfiguration=location)
+                             CreateBucketConfiguration=location)
     except ClientError as e:
         logging.error(e)
         return False
     return True
+
 
 def upload_file(file_name, bucket, s3, object_name=None):
     # If S3 object_name was not specified, use file_name
@@ -35,8 +37,8 @@ def upload_file(file_name, bucket, s3, object_name=None):
         return False
     return True
 
-def create_json(csv_path, json_path):
 
+def create_json(csv_path, json_path):
     """
     Args:
         csv_path : file path for the csv
@@ -47,20 +49,20 @@ def create_json(csv_path, json_path):
         Uses json.dumps() to dump the data and write to json
     """
 
-    data = {} 
-    with open(csv_path, encoding='utf-8') as csvf: 
-        csv_reader = csv.DictReader(csvf) 
-          
+    data = {}
+    with open(csv_path, encoding='utf-8') as csvf:
+        csv_reader = csv.DictReader(csvf)
+
         # Convert each row into a dictionary and add it to data 
-        for rows in csv_reader: 
-            key = rows['Title'] 
-            data[key] = rows 
+        for rows in csv_reader:
+            key = rows['Title']
+            data[key] = rows
 
-    with open(json_path, 'w', encoding='utf-8') as jsonf: 
-        jsonf.write(json.dumps(data, indent=4)) 
+    with open(json_path, 'w', encoding='utf-8') as jsonf:
+        jsonf.write(json.dumps(data, indent=4))
 
-def scrape_images(img_source, img_index, title, data_path, s3):
 
+def scrape_images(img_source, img_index, title, data_path):
     """
     Args:
         img_source : list of the 'a' elements which direct to the image download options
@@ -76,23 +78,24 @@ def scrape_images(img_source, img_index, title, data_path, s3):
 
     img_dl_page = requests.get(img_source[img_index].get("href"))
     img_soup = BeautifulSoup(img_dl_page.content, "html.parser")
-    img_link = img_soup.find("a", {"class" : "prem-link gr btn btn-secondary dis snax-action snax-action-add-to-collection snax-action-add-to-collection-downloads"}).get("href")
+    # img_link = img_soup.find("a", {"class": "prem-link gr btn btn-secondary dis snax-action snax-action-add-to-collection snax-action-add-to-collection-downloads"}).get("href")
+    # img_link = img_soup.find("a", {"class": "wp-post-image wp-post-image"}).get("href")
     img_name = title + ".jpg"
     img_path = os.path.join(data_path, img_name)
 
-    with open(img_path, "wb") as img_file:
-        img_file.write(requests.get(img_link).content)
+    # with open(img_path, "wb") as img_file:
+    #     img_file.write(requests.get(img_link).content)
 
-        with open(img_path, "rb") as s3_img:
-            s3.upload_fileobj(s3_img, "artvee", title + ".jpg")
-        s3_img.close()
+        # with open(img_path, "rb") as s3_img:
+        #     s3.upload_fileobj(s3_img, "artvee", title + ".jpg")
+        # s3_img.close()
 
-        img_file.close()
+        # img_file.close()
 
-    os.remove(img_path)
+    # os.remove(img_path)
 
-def scrape_meta_images(url, category, data_path, writer, s3):
 
+def scrape_meta_images(url, category, data_path, writer):
     """
     Args:  
         url (str): URL for the paginated category pages
@@ -111,14 +114,14 @@ def scrape_meta_images(url, category, data_path, writer, s3):
 
     page = requests.get(url)
     soup = BeautifulSoup(page.content, "html.parser")
-    cards = soup.find_all("div", {"class" : re.compile("product-grid-item product woodmart-hover-tiled*")})
-    img_source = soup.find_all("a", {"class" : "product-image-link linko"})
+    cards = soup.find_all("div", {"class": re.compile("product-grid-item product woodmart-hover-tiled*")})
+    img_source = soup.find_all("a", {"class": "product-image-link linko"})
     img_index = 0
 
     for card in cards:
         data = []
 
-        #Formatted in nested if-statements to prevent receiving an error for a missing element/class (None type)
+        # Formatted in nested if-statements to prevent receiving an error for a missing element/class (None type)
         title = card.find("h3", class_="product-title")
         if (title != None):
             if (title.find("a") != None):
@@ -136,14 +139,14 @@ def scrape_meta_images(url, category, data_path, writer, s3):
             artist_info = "Unknown"
             data.append(artist_info)
 
-        scrape_images(img_source, img_index, title, data_path, s3)
+        scrape_images(img_source, img_index, title, data_path)
 
         data.append(category)
         writer.writerow(data)
         img_index += 1
 
-def count_pages(category):
 
+def count_pages(category):
     """
     Args:
         category : used in the url to find the page and its respective results
@@ -158,44 +161,53 @@ def count_pages(category):
     url = "https://artvee.com/c/%s/page/1/?per_page=48" % category
     page = requests.get(url)
     soup = BeautifulSoup(page.content, "html.parser")
-    results = soup.find("p", class_="woocommerce-result-count").text.strip("results").strip()
-    no_pages = math.floor(int(results) / 48)
+    if soup.find("p", class_="woocommerce-result-count") is not None:
+        results = soup.find("p", class_="woocommerce-result-count").text.strip("results").strip()
+        results = str.replace(results, ' item', '')
+        no_pages = math.floor(int(results) / 48)
+    else:
+        no_pages = 0
+        results = '0'
 
-    if (int(results) % 48 > 0):
+    if int(results) % 48 > 0:
         no_pages += 1
-    
+
     return no_pages
 
+
 if __name__ == "__main__":
-    s3 = boto3.client('s3')
-    create_bucket("artvee", s3, "us-west-1")
-    data_path = ""
+    # s3 = boto3.client('s3')
+    # create_bucket("artvee", s3, "us-west-1")
+    data_path = "./"
     csv_path = os.path.join(data_path, "artvee.csv")
     json_path = os.path.join(data_path + "artvee.json")
     if (data_path == ""):
         print("\nPlease assign a value to the data_path\n")
     else:
-        with open(csv_path, "w", newline = "", encoding="utf-8") as f:
-            #Create csv writer and header row
+        with open(csv_path, "w", newline="", encoding="utf-8") as f:
+            # Create csv writer and header row
             headers = ["Title", "Artist", "Category"]
             writer = csv.writer(f)
             writer.writerow(headers)
 
-            #Artvee categorizes its works and these are how they are written in the url
-            categories = ["abstract", "figurative", "landscape", "religion", "mythology", "posters", "animals", "illustration", "fashion", "still-life", "historical", "botanical", "drawings", "japanese-art"]
+            # Artvee categorizes its works and these are how they are written in the url
+            categories = ["abstract", "figurative", "landscape", "religion", "mythology", "posters", "animals",
+                          "illustration", "fashion", "still-life", "historical", "botanical", "drawings",
+                          "japanese-art"]
 
             for category in categories:
                 no_pages = count_pages(category)
 
-                #Pagination
+                # Pagination
                 for p in range(1, no_pages + 1):
                     print("Currently looking at: %s, page %d" % (category, p))
                     url = "https://artvee.com/c/%s/page/%d/?per_page=48" % (category, p)
-                    scrape_meta_images(url, category, data_path, writer, s3)
+                    # url = "https://artvee.com/"
+                    scrape_meta_images(url, category, data_path, writer)
 
             f.close()
 
-        #Create the json after all data is written in the csv and upload it to s3 bucket
+        # Create the json after all data is written in the csv and upload it to s3 bucket
         create_json(csv_path, json_path)
-        with open(json_path, "rb") as s3_meta:
-            s3.upload_fileobj(s3_meta, "artvee", "artveeMeta.json")
+        # with open(json_path, "rb") as s3_meta:
+            # s3.upload_fileobj(s3_meta, "artvee", "artveeMeta.json")
