@@ -1,0 +1,3 @@
+([('artveeScraper',
+   '/Users/thomasfeuillatre/Desktop/artveeScraper/dist/artveeScraper',
+   'EXECUTABLE')],)
